@@ -1,0 +1,1458 @@
+// Control functions
+        window.expandAll = function() {
+            function expand(node) {
+                node.collapsed = false;
+                if (node.children) {
+                    node.children.forEach(expand);
+                }
+            }
+            expand(mindMapData);
+            draw();
+        };
+        
+        window.collapseAll = function() {
+            function collapse(node) {
+                if (node.level > 0) {
+                    node.collapsed = true;
+                }
+                if (node.children) {
+                    node.children.forEach(collapse);
+                }
+            }
+            collapse(mindMapData);
+            draw();
+        };<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Low-Carbon Facade Materials Research Mind Map</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 1000;
+        }
+        
+        .title-section {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 0.9em;
+        }
+        
+        .controls-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .search-container {
+            position: relative;
+            flex: 0 1 300px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px 40px 10px 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .search-icon {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a0aec0;
+        }
+        
+        .clear-search {
+            position: absolute;
+            right: 40px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #e2e8f0;
+            border: none;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: #4a5568;
+        }
+        
+        .clear-search:hover {
+            background: #cbd5e0;
+        }
+        
+        .search-results {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 1001;
+            display: none;
+            max-width: 300px;
+        }
+        
+        .search-results.active {
+            display: block;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        
+        button:hover {
+            background: #5a67d8;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .zoom-controls {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        
+        .zoom-level {
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.1);
+            border-radius: 15px;
+            font-size: 12px;
+            min-width: 50px;
+            text-align: center;
+        }
+        
+        .mindmap-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: white;
+        }
+        
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        
+        svg.grabbing {
+            cursor: grabbing;
+        }
+        
+        .node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .node.highlighted {
+            filter: none !important;
+            opacity: 1 !important;
+        }
+        
+        .node.dimmed {
+            opacity: 0.3;
+            filter: grayscale(80%);
+        }
+        
+        .node-circle {
+            transition: all 0.3s ease;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+        }
+        
+        .node:hover .node-circle {
+            filter: brightness(1.1) drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+            transform: scale(1.1);
+        }
+        
+        .node-text {
+            pointer-events: none;
+            user-select: none;
+            fill: #2d3748;
+        }
+        
+        .center-node .node-text {
+            fill: white;
+            font-weight: bold;
+        }
+        
+        .primary-node .node-text {
+            font-weight: 600;
+        }
+        
+        .link {
+            fill: none;
+            stroke-opacity: 0.3;
+            transition: all 0.3s ease;
+        }
+        
+        .link.highlighted {
+            stroke-opacity: 0.8 !important;
+            stroke-width: 3 !important;
+        }
+        
+        .link.dimmed {
+            stroke-opacity: 0.1;
+        }
+        
+        .tooltip {
+            position: absolute;
+            padding: 12px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            border-radius: 8px;
+            font-size: 13px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+            max-width: 350px;
+            z-index: 2000;
+            line-height: 1.4;
+        }
+        
+        .tooltip strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .legend-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #2d3748;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 250px;
+            font-size: 12px;
+            color: #4a5568;
+        }
+        
+        .info-panel h3 {
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+        
+        .info-panel ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .info-panel li {
+            margin-bottom: 4px;
+            padding-left: 15px;
+            position: relative;
+        }
+        
+        .info-panel li:before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+        }
+        
+        @media (max-width: 768px) {
+            .controls-section {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .search-container {
+                width: 100%;
+                flex: 1;
+            }
+            
+            .button-group {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            button {
+                font-size: 12px;
+                padding: 8px 16px;
+            }
+            
+            h1 {
+                font-size: 1.5em;
+            }
+            
+            .info-panel, .legend {
+                display: none;
+            }
+        }
+        
+        .stats-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            font-size: 12px;
+            color: #4a5568;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title-section">
+                <h1>🏢 Low-Carbon Facade Materials Research</h1>
+                <div class="subtitle">Zero Carbon Target 2040 - Interactive Mind Map</div>
+            </div>
+            
+            <div class="controls-section">
+                <div class="search-container">
+                    <input type="text" class="search-input" placeholder="Search materials, concepts, or metrics..." id="searchInput">
+                    <button class="clear-search" id="clearSearch">×</button>
+                    <span class="search-icon">🔍</span>
+                </div>
+                
+                <div class="button-group">
+                    <button onclick="expandAll()">📂 Expand All</button>
+                    <button onclick="collapseAll()">📁 Collapse All</button>
+                    <button onclick="resetView()">🎯 Reset View</button>
+                </div>
+                
+                <div class="zoom-controls">
+                    <button onclick="zoomIn()">➕</button>
+                    <span class="zoom-level" id="zoomLevel">100%</span>
+                    <button onclick="zoomOut()">➖</button>
+                </div>
+                
+                <button onclick="exportData()">💾 Export Data</button>
+            </div>
+        </div>
+        
+        <div class="mindmap-container">
+            <svg id="mindmap"></svg>
+            <div class="tooltip"></div>
+            
+            <div class="search-results" id="searchResults"></div>
+            
+            <div class="info-panel">
+                <h3>Navigation Tips</h3>
+                <ul>
+                    <li>Click nodes to expand/collapse</li>
+                    <li>Drag to pan around</li>
+                    <li>Scroll to zoom in/out</li>
+                    <li>Search for specific topics</li>
+                    <li>Hover for details</li>
+                </ul>
+            </div>
+            
+            <div class="legend">
+                <div class="legend-title">Category Legend</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #6366f1;"></div>
+                    <span>Core Focus</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #10b981;"></div>
+                    <span>Materials</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #f59e0b;"></div>
+                    <span>Assessment</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #ef4444;"></div>
+                    <span>Innovation</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #8b5cf6;"></div>
+                    <span>Supply Chain</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #06b6d4;"></div>
+                    <span>Concrete/GRC</span>
+                </div>
+            </div>
+            
+            <div class="stats-panel" id="statsPanel">
+                Nodes: <span id="nodeCount">0</span> | Expanded: <span id="expandedCount">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Complete mind map data structure
+        const mindMapData = {
+            name: "Low-Carbon\nFacade Materials",
+            color: "#6366f1",
+            description: "Central hub for zero carbon facade research targeting 2040",
+            children: [
+                {
+                    name: "Carbon Assessment\nFramework",
+                    color: "#f59e0b",
+                    description: "Tools and metrics for measuring facade carbon impact",
+                    children: [
+                        {
+                            name: "Baseline Metrics",
+                            description: "Establishing current carbon baselines",
+                            children: [
+                                { name: "Current facade carbon\n(kgCO2e/m²)", description: "Measure existing facade systems carbon footprint" },
+                                { name: "Lifecycle stages\n(A1-A5, B, C, D)", description: "Analyze all lifecycle phases from production to end-of-life" },
+                                { name: "Functional unit\ndefinition", description: "Standardize measurement units for comparison" },
+                                { name: "EPD standardization", description: "Ensure consistent Environmental Product Declarations" }
+                            ]
+                        },
+                        {
+                            name: "Measurement Tools",
+                            description: "Software and protocols for assessment",
+                            children: [
+                                { name: "LCA methodologies", description: "Life Cycle Assessment approaches" },
+                                { name: "Carbon calculators", description: "Digital tools for carbon quantification" },
+                                { name: "Verification protocols", description: "Third-party validation processes" },
+                                { name: "Uncertainty ranges", description: "Managing data quality variations" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "Structural Materials",
+                    color: "#10b981",
+                    description: "Primary load-bearing facade materials",
+                    children: [
+                        {
+                            name: "Aluminum",
+                            description: "Lightweight metal framing systems",
+                            children: [
+                                { name: "Primary aluminum\n(13-15 kgCO2e/kg)", description: "Virgin aluminum from bauxite" },
+                                { name: "Recycled aluminum\n(1-2 kgCO2e/kg)", description: "90% carbon reduction through recycling" },
+                                { name: "75%+ recycled\ncontent targets", description: "Achievable recycled content goals" },
+                                { name: "Renewable energy\nsmelting", description: "Hydro CIRCAL, REDUXA options" },
+                                { name: "Surface treatments", description: "Anodizing vs powder coating impacts" }
+                            ]
+                        },
+                        {
+                            name: "Steel",
+                            description: "High-strength framing options",
+                            children: [
+                                { name: "Electric arc\nfurnace steel", description: "Lower carbon production method" },
+                                { name: "Recycled content\nverification", description: "Chain of custody tracking" },
+                                { name: "Cold-formed vs\nhot-rolled", description: "Manufacturing process impacts" },
+                                { name: "Corrosion protection", description: "Galvanizing and coating options" }
+                            ]
+                        },
+                        {
+                            name: "Concrete Precast",
+                            color: "#06b6d4",
+                            description: "Traditional precast concrete elements",
+                            children: [
+                                { name: "CEM I\n(350-400 kgCO2e/t)", description: "Standard Portland cement baseline" },
+                                { name: "CEM II/A\n(280-350 kgCO2e/t)", description: "6-20% SCM replacement" },
+                                { name: "CEM III/A\n(150-250 kgCO2e/t)", description: "36-65% GGBS content" },
+                                { name: "CEM III/B\n(<150 kgCO2e/t)", description: "66-80% GGBS - optimal low carbon" },
+                                { name: "GGBS content\n(50-70%)", description: "Ground granulated blast-furnace slag" },
+                                { name: "Fly ash\n(20-35%)", description: "Coal combustion byproduct utilization" },
+                                { name: "Recycled aggregates", description: "RCA from demolished structures" },
+                                { name: "Hollow core panels", description: "30-50% material reduction" },
+                                { name: "CarbonCure injection", description: "CO2 mineralization technology" }
+                            ]
+                        },
+                        {
+                            name: "GRC Panels",
+                            color: "#06b6d4",
+                            description: "Glass Reinforced Concrete - lightweight alternative",
+                            children: [
+                                { name: "Cement content\n(30-50%)", description: "Lower than traditional precast" },
+                                { name: "Glass fiber\n(3-5%)", description: "AR glass vs E-glass options" },
+                                { name: "10-15mm thickness", description: "vs 75-150mm precast" },
+                                { name: "75% weight\nreduction", description: "Transport and structural savings" },
+                                { name: "SCM optimization\n(>40%)", description: "Maximizing cement replacement" },
+                                { name: "Spray-up method", description: "Manual application process" },
+                                { name: "Premix method", description: "Automated production option" }
+                            ]
+                        },
+                        {
+                            name: "Timber/Wood",
+                            description: "Bio-based structural systems",
+                            children: [
+                                { name: "Carbon sequestration", description: "Biogenic carbon accounting methods" },
+                                { name: "CLT systems", description: "Cross-laminated timber panels" },
+                                { name: "Glulam beams", description: "Glued laminated timber" },
+                                { name: "Modified wood\n(Accoya)", description: "Acetylated wood products" },
+                                { name: "FSC/PEFC certification", description: "Sustainable forest management" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "Cladding Materials",
+                    color: "#10b981",
+                    description: "External facade finishing systems",
+                    children: [
+                        {
+                            name: "Traditional",
+                            description: "Conventional cladding options",
+                            children: [
+                                { name: "Natural stone\n(<500km)", description: "Local sourcing priority" },
+                                { name: "Brick systems", description: "Fired and unfired options" },
+                                { name: "Terracotta", description: "Rainscreen panel systems" },
+                                { name: "Metal panels", description: "Zinc, copper, corten steel" }
+                            ]
+                        },
+                        {
+                            name: "Low-Carbon",
+                            description: "Reduced carbon alternatives",
+                            children: [
+                                { name: "Fiber cement", description: "Composite panel systems" },
+                                { name: "Recycled plastics", description: "Post-consumer waste panels" },
+                                { name: "Reclaimed timber", description: "Salvaged wood cladding" },
+                                { name: "Crushed glass", description: "Recycled glass composites" }
+                            ]
+                        },
+                        {
+                            name: "Bio-based",
+                            description: "Natural and grown materials",
+                            children: [
+                                { name: "Hemp panels", description: "Rapidly renewable fiber" },
+                                { name: "Bamboo systems", description: "Engineered bamboo products" },
+                                { name: "Mycelium composites", description: "Fungal-based materials" },
+                                { name: "Agricultural waste", description: "Straw and rice husk boards" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "Glazing Systems",
+                    color: "#10b981",
+                    description: "Transparent facade components",
+                    children: [
+                        {
+                            name: "Glass Production",
+                            description: "Manufacturing and specification",
+                            children: [
+                                { name: "Float vs low-iron", description: "Standard vs ultra-clear glass" },
+                                { name: "Double vs triple", description: "Glazing unit comparison" },
+                                { name: "Recycled cullet", description: "Post-consumer glass content" },
+                                { name: "Regional manufacturing", description: "Transport distance optimization" },
+                                { name: "Coatings impact", description: "Low-E and solar control" }
+                            ]
+                        },
+                        {
+                            name: "Frame Materials",
+                            description: "Window and curtain wall frames",
+                            children: [
+                                { name: "Timber frames", description: "FSC certified wood options" },
+                                { name: "uPVC systems", description: "Recycled content potential" },
+                                { name: "Aluminum frames", description: "Thermal break technology" },
+                                { name: "Composite frames", description: "Hybrid material systems" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "Insulation",
+                    color: "#10b981",
+                    description: "Thermal performance materials",
+                    children: [
+                        {
+                            name: "Conventional",
+                            description: "Standard insulation products",
+                            children: [
+                                { name: "Mineral wool", description: "Rock and glass wool options" },
+                                { name: "PIR/PUR foam", description: "Polyisocyanurate/polyurethane" },
+                                { name: "Phenolic foam", description: "High performance boards" },
+                                { name: "XPS/EPS", description: "Extruded/expanded polystyrene" }
+                            ]
+                        },
+                        {
+                            name: "Natural Options",
+                            description: "Bio-based insulation materials",
+                            children: [
+                                { name: "Wood fiber", description: "Recycled wood products" },
+                                { name: "Hemp insulation", description: "Cannabis sativa fiber" },
+                                { name: "Cork boards", description: "Expanded cork oak bark" },
+                                { name: "Sheep's wool", description: "Natural fiber insulation" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "Innovation Pipeline",
+                    color: "#ef4444",
+                    description: "Emerging and future technologies",
+                    children: [
+                        {
+                            name: "Near-term\n(2025-2030)",
+                            description: "Technologies approaching market readiness",
+                            children: [
+                                { name: "UHPC panels", description: "Ultra-high performance concrete" },
+                                { name: "Biocomposites", description: "Scaling production capacity" },
+                                { name: "3D printing", description: "Additive manufacturing" },
+                                { name: "Recycled carbon fiber", description: "Aerospace waste streams" }
+                            ]
+                        },
+                        {
+                            name: "Carbon-negative",
+                            description: "Materials that absorb CO2",
+                            children: [
+                                { name: "CO2-absorbing\nconcrete", description: "Mineralization technologies" },
+                                { name: "Algae panels", description: "Bioreactor facades" },
+                                { name: "Biochar integration", description: "Carbon sequestration additive" },
+                                { name: "Living walls", description: "Vegetated facade systems" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "Supply Chain",
+                    color: "#8b5cf6",
+                    description: "Sourcing and circular economy strategies",
+                    children: [
+                        {
+                            name: "Local Sourcing",
+                            description: "Regional material procurement",
+                            children: [
+                                { name: "500km radius", description: "Primary sourcing zone" },
+                                { name: "Material mapping", description: "Local availability audit" },
+                                { name: "Transport carbon", description: "Distance impact calculation" }
+                            ]
+                        },
+                        {
+                            name: "Circular Economy",
+                            description: "End-of-life strategies",
+                            children: [
+                                { name: "Take-back schemes", description: "Manufacturer agreements" },
+                                { name: "Material passports", description: "Digital documentation" },
+                                { name: "Design for\ndisassembly", description: "Reversible connections" }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    name: "Decision Criteria",
+                    color: "#f59e0b",
+                    description: "Evaluation frameworks and trade-offs",
+                    children: [
+                        {
+                            name: "Trade-offs",
+                            description: "Balancing competing priorities",
+                            children: [
+                                { name: "Performance vs\ncarbon", description: "Technical requirements balance" },
+                                { name: "Cost vs carbon\nsaved", description: "€/tCO2 metric analysis" },
+                                { name: "Durability vs\nembodied", description: "Lifespan optimization" }
+                            ]
+                        },
+                        {
+                            name: "Risk Assessment",
+                            description: "Technology and market risks",
+                            children: [
+                                { name: "Technology maturity", description: "TRL level evaluation" },
+                                { name: "Warranty implications", description: "Insurance and guarantees" },
+                                { name: "Code compliance", description: "Building regulations alignment" }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        };
+
+        // Initialize variables
+        const svg = document.getElementById('mindmap');
+        const tooltip = document.querySelector('.tooltip');
+        const searchInput = document.getElementById('searchInput');
+        const clearSearch = document.getElementById('clearSearch');
+        const searchResults = document.getElementById('searchResults');
+        const zoomLevelDisplay = document.getElementById('zoomLevel');
+        
+        let currentTransform = { x: 0, y: 0, scale: 1 };
+        let isDragging = false;
+        let startX, startY;
+        let searchQuery = '';
+        let highlightedNodes = new Set();
+        let totalNodes = 0;
+        let expandedNodes = 0;
+        
+        // SVG setup
+        const width = window.innerWidth;
+        const height = window.innerHeight - 100;
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        
+        // Create main group
+        const mainGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        svg.appendChild(mainGroup);
+        
+        // Calculate node positions with better spacing to prevent overlap
+        function calculateNodePositions(node, x = width/2, y = height/2, level = 0, angle = 0, angleRange = Math.PI * 2, parentRadius = 0) {
+            node.x = x;
+            node.y = y;
+            node.level = level;
+            node.id = (node.name || '').replace(/\s+/g, '-').toLowerCase();
+            
+            if (node.children && !node.collapsed) {
+                const childCount = node.children.length;
+                
+                // Calculate minimum angle between nodes to prevent overlap
+                const minAnglePerNode = Math.PI / 10; // Minimum 18 degrees between nodes
+                const requiredAngle = childCount * minAnglePerNode;
+                
+                // Use the larger of assigned angle range or required angle
+                const effectiveAngleRange = Math.max(angleRange, requiredAngle);
+                
+                // Adjust radius based on level and number of children
+                let radius;
+                if (level === 0) {
+                    // First level needs most space
+                    radius = Math.max(280, 200 + childCount * 15);
+                } else if (level === 1) {
+                    // Second level
+                    radius = Math.max(200, 140 + childCount * 10);
+                } else if (level === 2) {
+                    // Third level
+                    radius = Math.max(150, 100 + childCount * 8);
+                } else {
+                    // Deeper levels
+                    radius = Math.max(120, 80 + childCount * 5);
+                }
+                
+                // Ensure minimum distance from parent radius
+                radius = Math.max(radius, parentRadius + 100);
+                
+                // Calculate angle step with overlap prevention
+                const angleStep = effectiveAngleRange / childCount;
+                const startAngle = angle - effectiveAngleRange / 2;
+                
+                node.children.forEach((child, i) => {
+                    const childAngle = startAngle + angleStep * (i + 0.5);
+                    const childX = x + Math.cos(childAngle) * radius;
+                    const childY = y + Math.sin(childAngle) * radius;
+                    
+                    // Pass angle range to children, reducing it for deeper levels
+                    const childAngleRange = level === 0 ? angleStep * 0.9 : angleStep * 0.7;
+                    
+                    calculateNodePositions(child, childX, childY, level + 1, childAngle, childAngleRange, radius);
+                });
+            }
+        }
+        
+        // Draw nodes with adjusted sizes
+        function drawNodes(node, parentGroup) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('class', node.level === 0 ? 'node center-node' : 'node');
+            g.setAttribute('transform', `translate(${node.x}, ${node.y})`);
+            g.setAttribute('data-id', node.id);
+            
+            // Smaller node sizes to prevent overlap
+            const radius = node.level === 0 ? 40 : Math.max(12, 28 - node.level * 4);
+            const fontSize = node.level === 0 ? 13 : Math.max(8, 11 - node.level);
+            
+            if (node.level === 0) {
+                const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+                gradient.setAttribute('id', 'centerGradient');
+                
+                const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                stop1.setAttribute('offset', '0%');
+                stop1.setAttribute('stop-color', node.color);
+                stop1.setAttribute('stop-opacity', '0.9');
+                
+                const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                stop2.setAttribute('offset', '100%');
+                stop2.setAttribute('stop-color', node.color);
+                stop2.setAttribute('stop-opacity', '1');
+                
+                gradient.appendChild(stop1);
+                gradient.appendChild(stop2);
+                
+                if (!svg.querySelector('#centerGradient')) {
+                    svg.appendChild(gradient);
+                }
+            }
+            
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('r', radius);
+            circle.setAttribute('class', 'node-circle');
+            circle.setAttribute('fill', node.level === 0 ? 'url(#centerGradient)' : (node.color || '#e2e8f0'));
+            circle.setAttribute('stroke', '#fff');
+            circle.setAttribute('stroke-width', '2');
+            
+            g.appendChild(circle);
+            
+            // Folder icon for expandable nodes
+            if (node.children && node.level < 3) {
+                const icon = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                icon.setAttribute('x', radius - 8);
+                icon.setAttribute('y', -radius + 8);
+                icon.setAttribute('font-size', '10');
+                icon.setAttribute('fill', '#4a5568');
+                icon.textContent = node.collapsed ? '📁' : '📂';
+                g.appendChild(icon);
+            }
+            
+            // Text with better positioning
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('class', 'node-text');
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', node.level === 0 ? '#fff' : '#2d3748');
+            text.setAttribute('font-size', fontSize);
+            
+            const lines = (node.name || '').split('\n');
+            lines.forEach((line, i) => {
+                const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                tspan.textContent = line;
+                tspan.setAttribute('x', '0');
+                tspan.setAttribute('dy', i === 0 ? -(lines.length - 1) * fontSize / 2 : fontSize);
+                text.appendChild(tspan);
+            });
+            
+            g.appendChild(text);
+            
+            // Interactivity
+            g.addEventListener('mouseenter', (e) => {
+                if (node.description || node.children) {
+                    tooltip.innerHTML = `<strong>${(node.name || '').replace(/\n/g, ' ')}</strong>`;
+                    if (node.description) {
+                        tooltip.innerHTML += `<br>${node.description}`;
+                    }
+                    if (node.children) {
+                        tooltip.innerHTML += `<br><em>Click to ${node.collapsed ? 'expand' : 'collapse'} ${node.children.length} items</em>`;
+                    }
+                    tooltip.style.opacity = '1';
+                }
+            });
+            
+            g.addEventListener('mousemove', (e) => {
+                tooltip.style.left = Math.min(e.pageX + 10, window.innerWidth - 350) + 'px';
+                tooltip.style.top = e.pageY - 30 + 'px';
+            });
+            
+            g.addEventListener('mouseleave', () => {
+                tooltip.style.opacity = '0';
+            });
+            
+            if (node.children) {
+                g.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    node.collapsed = !node.collapsed;
+                    draw();
+                    updateStats();
+                });
+            }
+            
+            parentGroup.appendChild(g);
+            
+            if (node.children && !node.collapsed) {
+                node.children.forEach(child => drawNodes(child, parentGroup));
+            }
+        }
+            
+            if (!query) {
+                searchResults.classList.remove('active');
+                return;
+            }
+            
+            const results = searchNodes(query);
+            
+            if (results.length > 0) {
+                let resultsHTML = `<strong>Found ${results.length} matches:</strong><br>`;
+                results.slice(0, 10).forEach(result => {
+                    const shortPath = result.path.slice(-2).join(' → ');
+                    resultsHTML += `<div style="margin: 5px 0; cursor: pointer;" onclick="focusNode('${result.node.id}')">
+                        📍 ${shortPath}
+                    </div>`;
+                    highlightedNodes.add(result.node.id);
+                });
+                
+                if (results.length > 10) {
+                    resultsHTML += `<div style="margin-top: 5px; color: #718096;">...and ${results.length - 10} more</div>`;
+                }
+                
+                searchResults.innerHTML = resultsHTML;
+                searchResults.classList.add('active');
+                
+                document.querySelectorAll('.node').forEach(n => {
+                    const nodeId = n.getAttribute('data-id');
+                    if (highlightedNodes.has(nodeId)) {
+                        n.classList.add('highlighted');
+                    } else {
+                        n.classList.add('dimmed');
+                    }
+                });
+                
+                document.querySelectorAll('.link').forEach(l => {
+                    const sourceId = l.getAttribute('data-source');
+                    const targetId = l.getAttribute('data-target');
+                    if (highlightedNodes.has(sourceId) || highlightedNodes.has(targetId)) {
+                        l.classList.add('highlighted');
+                    } else {
+                        l.classList.add('dimmed');
+                    }
+                });
+            } else {
+                searchResults.innerHTML = '<strong>No matches found</strong>';
+                searchResults.classList.add('active');
+            }
+        }
+        
+        // Search functionality
+        function searchNodes(query) {
+            const results = [];
+            const lowerQuery = query.toLowerCase();
+            
+            function traverse(node, path = []) {
+                const currentPath = [...path, node.name];
+                const nodeText = (node.name || '').toLowerCase().replace(/\n/g, ' ');
+                const nodeDesc = (node.description || '').toLowerCase();
+                
+                if (nodeText.includes(lowerQuery) || nodeDesc.includes(lowerQuery)) {
+                    results.push({
+                        node: node,
+                        path: currentPath,
+                        matchType: nodeText.includes(lowerQuery) ? 'name' : 'description'
+                    });
+                }
+                
+                if (node.children) {
+                    node.children.forEach(child => traverse(child, currentPath));
+                }
+            }
+            
+            traverse(mindMapData);
+            return results;
+        }
+        
+        // Focus on specific node
+        window.focusNode = function(nodeId) {
+            const node = document.querySelector(`[data-id="${nodeId}"]`);
+            if (node) {
+                const transform = node.getAttribute('transform');
+                const match = transform.match(/translate\(([^,]+),([^)]+)\)/);
+                if (match) {
+                    const x = parseFloat(match[1]);
+                    const y = parseFloat(match[2]);
+                    
+                    currentTransform.x = width/2 - x * currentTransform.scale;
+                    currentTransform.y = height/2 - y * currentTransform.scale;
+                    currentTransform.scale = 1.5;
+                    
+                    updateTransform();
+                    updateZoomDisplay();
+                }
+            }
+        };
+        
+        // Draw links
+        function drawLinks(node, parentGroup) {
+            if (node.children && !node.collapsed) {
+                node.children.forEach(child => {
+                    const link = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    
+                    const dx = child.x - node.x;
+                    const dy = child.y - node.y;
+                    const dr = Math.sqrt(dx * dx + dy * dy);
+                    
+                    const mx = (node.x + child.x) / 2;
+                    const my = (node.y + child.y) / 2;
+                    const offset = dr * 0.2;
+                    
+                    link.setAttribute('d', `M${node.x},${node.y} Q${mx},${my - offset} ${child.x},${child.y}`);
+                    link.setAttribute('class', 'link');
+                    link.setAttribute('stroke', node.color || '#cbd5e0');
+                    link.setAttribute('stroke-width', Math.max(1, 4 - child.level));
+                    link.setAttribute('data-source', node.id);
+                    link.setAttribute('data-target', child.id);
+                    
+                    parentGroup.appendChild(link);
+                    drawLinks(child, parentGroup);
+                });
+            }
+        }
+        
+        // Draw nodes
+        function drawNodes(node, parentGroup) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.setAttribute('class', node.level === 0 ? 'node center-node' : 'node');
+            g.setAttribute('transform', `translate(${node.x}, ${node.y})`);
+            g.setAttribute('data-id', node.id);
+            
+            const radius = node.level === 0 ? 45 : Math.max(15, 35 - node.level * 5);
+            const fontSize = node.level === 0 ? 14 : Math.max(9, 12 - node.level);
+            
+            if (node.level === 0) {
+                const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'radialGradient');
+                gradient.setAttribute('id', 'centerGradient');
+                
+                const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                stop1.setAttribute('offset', '0%');
+                stop1.setAttribute('stop-color', node.color);
+                stop1.setAttribute('stop-opacity', '0.9');
+                
+                const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+                stop2.setAttribute('offset', '100%');
+                stop2.setAttribute('stop-color', node.color);
+                stop2.setAttribute('stop-opacity', '1');
+                
+                gradient.appendChild(stop1);
+                gradient.appendChild(stop2);
+                
+                if (!svg.querySelector('#centerGradient')) {
+                    svg.appendChild(gradient);
+                }
+            }
+            
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('r', radius);
+            circle.setAttribute('class', 'node-circle');
+            circle.setAttribute('fill', node.level === 0 ? 'url(#centerGradient)' : (node.color || '#e2e8f0'));
+            circle.setAttribute('stroke', '#fff');
+            circle.setAttribute('stroke-width', '2');
+            
+            g.appendChild(circle);
+            
+            if (node.children && node.level < 3) {
+                const icon = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                icon.setAttribute('x', radius - 8);
+                icon.setAttribute('y', -radius + 8);
+                icon.setAttribute('font-size', '10');
+                icon.setAttribute('fill', '#4a5568');
+                icon.textContent = node.collapsed ? '📁' : '📂';
+                g.appendChild(icon);
+            }
+            
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('class', 'node-text');
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', node.level === 0 ? '#fff' : '#2d3748');
+            text.setAttribute('font-size', fontSize);
+            
+            const lines = (node.name || '').split('\n');
+            lines.forEach((line, i) => {
+                const tspan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                tspan.textContent = line;
+                tspan.setAttribute('x', '0');
+                tspan.setAttribute('dy', i === 0 ? -(lines.length - 1) * fontSize / 2 : fontSize);
+                text.appendChild(tspan);
+            });
+            
+            g.appendChild(text);
+            
+            g.addEventListener('mouseenter', (e) => {
+                if (node.description) {
+                    tooltip.innerHTML = `<strong>${(node.name || '').replace(/\n/g, ' ')}</strong><br>${node.description}`;
+                    if (node.children) {
+                        tooltip.innerHTML += `<br><em>Click to ${node.collapsed ? 'expand' : 'collapse'} ${node.children.length} items</em>`;
+                    }
+                    tooltip.style.opacity = '1';
+                }
+            });
+            
+            g.addEventListener('mousemove', (e) => {
+                tooltip.style.left = Math.min(e.pageX + 10, window.innerWidth - 350) + 'px';
+                tooltip.style.top = e.pageY - 30 + 'px';
+            });
+            
+            g.addEventListener('mouseleave', () => {
+                tooltip.style.opacity = '0';
+            });
+            
+            if (node.children) {
+                g.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    node.collapsed = !node.collapsed;
+                    draw();
+                    updateStats();
+                });
+            }
+            
+            parentGroup.appendChild(g);
+            
+            if (node.children && !node.collapsed) {
+                node.children.forEach(child => drawNodes(child, parentGroup));
+            }
+        }
+        
+        // Count statistics
+        function countNodes(node) {
+            totalNodes = 0;
+            expandedNodes = 0;
+            
+            function traverse(n) {
+                totalNodes++;
+                if (n.children) {
+                    if (!n.collapsed) expandedNodes++;
+                    n.children.forEach(traverse);
+                }
+            }
+            
+            traverse(node);
+        }
+        
+        // Update statistics
+        function updateStats() {
+            countNodes(mindMapData);
+            document.getElementById('nodeCount').textContent = totalNodes;
+            document.getElementById('expandedCount').textContent = expandedNodes;
+        }
+        
+        // Main draw function
+        function draw() {
+            mainGroup.innerHTML = '';
+            
+            calculateNodePositions(mindMapData);
+            
+            const linksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            linksGroup.setAttribute('class', 'links-group');
+            drawLinks(mindMapData, linksGroup);
+            mainGroup.appendChild(linksGroup);
+            
+            const nodesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            nodesGroup.setAttribute('class', 'nodes-group');
+            drawNodes(mindMapData, nodesGroup);
+            mainGroup.appendChild(nodesGroup);
+            
+            if (searchQuery) {
+                highlightSearchResults(searchQuery);
+            }
+            
+            updateStats();
+        }
+        
+        // Transform functions
+        function updateTransform() {
+            mainGroup.setAttribute('transform', 
+                `translate(${currentTransform.x}, ${currentTransform.y}) scale(${currentTransform.scale})`);
+        }
+        
+        function updateZoomDisplay() {
+            zoomLevelDisplay.textContent = Math.round(currentTransform.scale * 100) + '%';
+        }
+        
+        
+        // Control functions
+        window.expandAll = function() {
+            function expand(node) {
+                node.collapsed = false;
+                if (node.children) {
+                    node.children.forEach(expand);
+                }
+            }
+            expand(mindMapData);
+            draw();
+        };
+        
+        window.collapseAll = function() {
+            function collapse(node) {
+                if (node.level > 0) {
+                    node.collapsed = true;
+                }
+                if (node.children) {
+                    node.children.forEach(collapse);
+                }
+            }
+            collapse(mindMapData);
+            draw();
+        };
+        
+        // Initialize with better default zoom for visibility
+        window.resetView = function() {
+            currentTransform = { x: 0, y: 0, scale: 0.85 };
+            updateTransform();
+            updateZoomDisplay();
+            expandAll();
+        };
+        
+        window.zoomIn = function() {
+            currentTransform.scale = Math.min(3, currentTransform.scale * 1.2);
+            updateTransform();
+            updateZoomDisplay();
+        };
+        
+        window.zoomOut = function() {
+            currentTransform.scale = Math.max(0.2, currentTransform.scale / 1.2);
+            updateTransform();
+            updateZoomDisplay();
+        };
+        
+        window.exportData = function() {
+            // Prepare both text and CSV export options
+            const format = confirm('Export as CSV? (OK for CSV, Cancel for Text)');
+            
+            if (format) {
+                // CSV Export
+                function extractCSV(node, level = 0, parentPath = '') {
+                    const rows = [];
+                    const currentPath = parentPath ? parentPath + ' > ' + (node.name || '').replace(/\n/g, ' ') : (node.name || '').replace(/\n/g, ' ');
+                    
+                    rows.push({
+                        level: level,
+                        category: level === 0 ? 'Root' : level === 1 ? 'Main Category' : level === 2 ? 'Sub Category' : 'Detail',
+                        name: (node.name || '').replace(/\n/g, ' '),
+                        description: node.description || '',
+                        color: node.color || '',
+                        path: currentPath
+                    });
+                    
+                    if (node.children) {
+                        node.children.forEach(child => {
+                            rows.push(...extractCSV(child, level + 1, currentPath));
+                        });
+                    }
+                    return rows;
+                }
+                
+                const csvData = extractCSV(mindMapData);
+                
+                // Create CSV content
+                const headers = ['Level', 'Category Type', 'Name', 'Description', 'Color Code', 'Full Path'];
+                const csvContent = [
+                    headers.join(','),
+                    ...csvData.map(row => [
+                        row.level,
+                        `"${row.category}"`,
+                        `"${row.name}"`,
+                        `"${row.description}"`,
+                        `"${row.color}"`,
+                        `"${row.path}"`
+                    ].join(','))
+                ].join('\n');
+                
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'facade-materials-mindmap-' + Date.now() + '.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+                
+            } else {
+                // Text Export (original)
+                function extractText(node, indent = '') {
+                    let text = indent + '• ' + (node.name || '').replace(/\n/g, ' ');
+                    if (node.description) {
+                        text += ' - ' + node.description;
+                    }
+                    text += '\n';
+                    
+                    if (node.children) {
+                        node.children.forEach(child => {
+                            text += extractText(child, indent + '  ');
+                        });
+                    }
+                    return text;
+                }
+                
+                const header = 'LOW-CARBON FACADE MATERIALS RESEARCH - MIND MAP\n' +
+                              'Zero Carbon Target 2040\n' +
+                              'Generated: ' + new Date().toLocaleDateString() + '\n\n';
+                
+                const content = extractText(mindMapData);
+                
+                const blob = new Blob([header + content], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'facade-materials-mindmap-' + Date.now() + '.txt';
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        };
+        
+        // Pan and zoom event handlers
+        svg.addEventListener('mousedown', (e) => {
+            if (e.target === svg || e.target.parentNode === mainGroup || e.target.parentNode.parentNode === mainGroup) {
+                isDragging = true;
+                svg.classList.add('grabbing');
+                startX = e.clientX - currentTransform.x;
+                startY = e.clientY - currentTransform.y;
+            }
+        });
+        
+        svg.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                currentTransform.x = e.clientX - startX;
+                currentTransform.y = e.clientY - startY;
+                updateTransform();
+            }
+        });
+        
+        svg.addEventListener('mouseup', () => {
+            isDragging = false;
+            svg.classList.remove('grabbing');
+        });
+        
+        svg.addEventListener('mouseleave', () => {
+            isDragging = false;
+            svg.classList.remove('grabbing');
+        });
+        
+        svg.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = currentTransform.scale * delta;
+            
+            if (newScale >= 0.3 && newScale <= 3) {
+                const rect = svg.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+                
+                currentTransform.x = x - (x - currentTransform.x) * delta;
+                currentTransform.y = y - (y - currentTransform.y) * delta;
+                currentTransform.scale = newScale;
+                
+                updateTransform();
+                updateZoomDisplay();
+            }
+        });
+        
+        // Search event handlers
+        searchInput.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            clearSearch.style.display = searchQuery ? 'flex' : 'none';
+            
+            if (searchQuery.length >= 2) {
+                highlightSearchResults(searchQuery);
+            } else {
+                highlightSearchResults('');
+            }
+        });
+        
+        clearSearch.addEventListener('click', () => {
+            searchInput.value = '';
+            searchQuery = '';
+            clearSearch.style.display = 'none';
+            highlightSearchResults('');
+        });
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case '=':
+                    case '+':
+                        e.preventDefault();
+                        zoomIn();
+                        break;
+                    case '-':
+                        e.preventDefault();
+                        zoomOut();
+                        break;
+                    case '0':
+                        e.preventDefault();
+                        resetView();
+                        break;
+                    case 'f':
+                        e.preventDefault();
+                        searchInput.focus();
+                        break;
+                }
+            }
+        });
+        
+        // Responsive handling
+        window.addEventListener('resize', () => {
+            const newWidth = window.innerWidth;
+            const newHeight = window.innerHeight - 100;
+            svg.setAttribute('viewBox', `0 0 ${newWidth} ${newHeight}`);
+            draw();
+        });
+        
+        // Initialize the mind map with better spacing
+        currentTransform = { x: 0, y: 0, scale: 0.75 }; // Start zoomed out to see all nodes
+        draw();
+        updateTransform();
+        updateZoomDisplay();
+        updateStats();
+    </script>
+</body>
+</html>
